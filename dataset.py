@@ -44,15 +44,10 @@ class MyImageDataset(Dataset):
 
     def __len__(self):
         return len(self.file)
-
-    def __getitem__(self, index):
-
-        label = torch.tensor(self.label[index])
-
-        data = Image.open(self.file[index])
-        data = self.normalize(data)
-
-        return data, label
+    def __getitem__(self, idx):
+        image = torch.from_numpy(self.images[idx]).float()
+        label = torch.tensor(self.labels[idx], dtype=torch.long).squeeze()  # FIX HERE
+        return image, label
 
 
 def get_dataset(conf, data):

@@ -62,16 +62,16 @@ class Client(object):
         """
         Local training with proper batch size handling
         """
-        # Copy the global model parameters
+        
         for name, param in model.state_dict().items():
             self.local_model.state_dict()[name].copy_(param.clone())
 
         optimizer = torch.optim.Adam(self.local_model.parameters(), lr=self.conf['lr'], weight_decay=self.conf["weight_decay"])
         criterion = torch.nn.CrossEntropyLoss()
         
-        # Pre-process Yg to ensure correct dimensions
+        
         if len(self.Yg.shape) == 3 and self.Yg.shape[1] == 1:
-            self.Yg = self.Yg.squeeze(1)  # Remove the middle singleton dimension
+            self.Yg = self.Yg.squeeze(1)  
         
         for e in range(self.conf["local_epochs"]):
             self.local_model.train()
@@ -79,30 +79,29 @@ class Client(object):
             batch_count = 0
 
             for batch_id, batch in enumerate(self.train_loader):
-                print(batch_id, batch)
                 data, target = batch
-                print(data.shape,target.shape)
-                current_batch_size = data.size(0)  # Use actual batch size
-
-                # Prepare input
-                inputX = (1 - lamb) * data
+                target = target.squeeze() 
+                
+                current_batch_size = data.size(0)
+   
+                inputX = (1 - lamb) * data   
                 inputX.requires_grad_()
 
-                # Select random global sample
+                
                 idg = torch.randint(len(self.Xg), (1,)).item()
                 
-                # Handle Xg dimensions - use current_batch_size
-                xg = self.Xg[idg]  # Get single sample
-                if len(xg.shape) == 3:  # If [C, H, W]
-                    xg = xg.unsqueeze(0)  # Add batch dimension -> [1, C, H, W]
-                xg = xg.expand(current_batch_size, -1, -1, -1)  # Expand to current batch size
+                
+                xg = self.Xg[idg]  
+                if len(xg.shape) == 3:  
+                    xg = xg.unsqueeze(0)  
+                xg = xg.expand(current_batch_size, -1, -1, -1)  
 
-                # Handle Yg dimensions - use current_batch_size
-                yg = self.Yg[idg]  # Get single sample
-                if len(yg.shape) > 1:  # If more than 1 dimension
-                    yg = yg.squeeze()  # Remove extra dimensions
-                yg = yg.unsqueeze(0)  # Add batch dimension
-                yg = yg.expand(current_batch_size, -1)  # Expand to current batch size
+                
+                yg = self.Yg[idg]  
+                if len(yg.shape) > 1: 
+                    yg = yg.squeeze()  
+                yg = yg.unsqueeze(0)  
+                yg = yg.expand(current_batch_size, -1) 
 
                 if torch.cuda.is_available():
                     data = data.cuda()
@@ -113,7 +112,7 @@ class Client(object):
 
                 optimizer.zero_grad()
                 features, output = self.local_model(inputX)
-                print(output.shape)
+                
 
                 
                 loss1 = (1 - lamb) * criterion(output, target)
@@ -144,28 +143,31 @@ class Client(object):
     @torch.no_grad()
     def model_eval(self):
         self.local_model.eval()
-
+        
         total_loss = 0.0
         correct = 0
         dataset_size = 0
-
+        
         criterion = torch.nn.CrossEntropyLoss()
+        
         for batch_id, batch in enumerate(self.train_loader):
             data, target = batch
+            target = target.squeeze()  # Add squeeze here <<<<<<<<<<
+            
             dataset_size += data.size()[0]
-
+            
             if torch.cuda.is_available():
                 data = data.cuda()
                 target = target.cuda()
-
+                
             _, output = self.local_model(data)
-
+            
             total_loss += criterion(output, target)
             pred = output.data.max(1)[1]
-
+            
             correct += pred.eq(target.data.view_as(pred)).cpu().sum().item()
-
+        
         acc = 100.0 * (float(correct) / float(dataset_size))
         total_l = total_loss.cpu().detach().numpy() / dataset_size
-
+        
         return acc, total_l

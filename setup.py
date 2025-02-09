@@ -10,8 +10,8 @@ from sklearn.model_selection import train_test_split
 
 
 class OrganAMNISTModel(nn.Module):
-    def init(self):
-        super(OrganAMNISTModel, self).init()
+    def __init__(self):
+        super(OrganAMNISTModel, self).__init__()
         self.features = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, padding=1),
             nn.ReLU(),
@@ -23,18 +23,16 @@ class OrganAMNISTModel(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(2)
         )
-
         self.classifier = nn.Sequential(
-            nn.Linear(64 * 4 * 4, 128),
+            nn.Linear(64 * 3 * 3, 128),  # Changed from 64*4*4 to 64*3*3
             nn.ReLU(),
-            nn.Linear(128, 11)  # OrganAMNIST has 11 classes
+            nn.Linear(128, 11)
         )
 
     def forward(self, x):
         features = self.features(x)
-        features = features.view(-1, 64 * 4 * 4)
+        features = features.view(-1, 64 * 3 * 3)  # Ensure correct reshaping
         out = self.classifier(features)
-        #print(features.shape,out.shape)
         return features, out
 
 def setup_fedmix():
